@@ -1,3 +1,0 @@
-# my-skill
-
-Repository bootstrap.
