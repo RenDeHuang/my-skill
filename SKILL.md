@@ -19,11 +19,13 @@ This skill is aligned with three prompt specs in `/Users/huangrende/Desktop/ppt/
 ## Workflow Contract
 
 1. **Extract facts** from source materials (论文、旧PPT、补充文档、图片)。
+   - 默认排除 rebuttal/审稿回复类文件（如 `Response to referees`），避免答辩叙事跑偏。
 2. **Apply strategy** (`assets/strategy.template.json` or `--strategy`) to drive audience, goal, style, pacing.
 3. **Build outline JSON** with markdown-aligned fields:
    - `slide_number`, `page_type`, `title`
    - `on_slide_content`, `visual_spec`
    - mode-specific: `speaker_script` or `design_rationale`
+   - 汇报主线默认按 `研究背景 -> 研究方法 -> 研究结果 -> 研究展望` 组织。
 4. **Render editable PPTX** using text boxes and vector shapes (never full-slide raster output).
 5. **Run QA checks** and emit `*.qa.json`:
    - no placeholders
@@ -72,6 +74,7 @@ Each run writes:
 - Content pages include both text and simple visual elements (`viz-*`).
 - Image policy is `material_only`: do not assume missing images.
 - Citation policy defaults to `public_sources_only`.
+- Rebuttal narrative is excluded by default unless explicitly enabled.
 
 ## References
 

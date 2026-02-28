@@ -56,6 +56,44 @@ class OutlineTests(unittest.TestCase):
         self.assertTrue(all(not s.get("speaker_notes") for s in content_slides))
         self.assertTrue(any(len(" ".join(s.get("bullets", []))) > 140 for s in content_slides))
 
+    def test_outline_uses_thesis_arc_and_excludes_rebuttal_narrative(self):
+        summary = {
+            "project_title": "毕业论文汇报",
+            "documents": [
+                {
+                    "file": "中山大学硕士学位论文-黄仁德.docx",
+                    "kind": "docx",
+                    "key_points": [
+                        "研究背景：当前缺乏跨癌种小RNA统一资源，影响可比性分析。",
+                        "研究方法：构建标准化处理流程并建立统一注释体系。",
+                        "研究结果：在多癌种队列中识别到稳定差异表达信号并完成生存关联分析。",
+                        "研究展望：扩展样本规模并增强临床转化应用。",
+                    ],
+                },
+                {
+                    "file": "Response to referees.docx",
+                    "kind": "docx",
+                    "key_points": [
+                        "Reviewer 1 requested additional validation experiments.",
+                        "Response: we clarified comments point by point.",
+                    ],
+                },
+            ],
+            "images": [],
+        }
+
+        outline = build_outline(summary, mode="presentation")
+        titles = " ".join(s.get("title", "") for s in outline["slides"])
+        content = " ".join(" ".join(s.get("on_slide_content", [])) for s in outline["slides"])
+        merged = f"{titles} {content}".lower()
+
+        self.assertIn("研究背景", titles)
+        self.assertIn("研究方法", titles)
+        self.assertIn("研究结果", titles)
+        self.assertIn("研究展望", titles)
+        self.assertNotIn("审稿", merged)
+        self.assertNotIn("reviewer", merged)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,16 @@ SKIP_PATTERNS = [
     "学位论文作者签名",
     "答辩委员会",
 ]
+REBUTTAL_FILE_PATTERNS = [
+    "response to referees",
+    "response to reviewers",
+    "rebuttal",
+    "point-by-point",
+    "审稿",
+    "回复",
+    "referee",
+    "reviewer",
+]
 
 
 def _clean_text(text: str) -> str:
@@ -30,6 +40,11 @@ def _looks_useful(line: str) -> bool:
     if len(line) < 18:
         return False
     return not any(pat in line for pat in SKIP_PATTERNS)
+
+
+def _is_rebuttal_file(name: str) -> bool:
+    lowered = str(name).lower()
+    return any(pat in lowered for pat in REBUTTAL_FILE_PATTERNS)
 
 
 def _extract_docx_points(path: Path, max_points: int = 120) -> list[str]:
@@ -128,10 +143,14 @@ def _derive_title(documents: list[dict[str, Any]]) -> str:
     if candidates:
         candidates.sort(key=lambda x: x[0], reverse=True)
         return candidates[0][1]
-    return "毕业材料汇报"
+    return "毕业论文与论文工作汇报"
 
 
-def build_summary(materials_dir: Path, output_dir: Path) -> dict[str, Any]:
+def build_summary(
+    materials_dir: Path,
+    output_dir: Path,
+    exclude_rebuttal: bool = True,
+) -> dict[str, Any]:
     materials_dir = materials_dir.resolve()
     output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -145,6 +164,9 @@ def build_summary(materials_dir: Path, output_dir: Path) -> dict[str, Any]:
     files = sorted([p for p in materials_dir.iterdir() if p.is_file()])
     for path in files:
         suffix = path.suffix.lower()
+        if exclude_rebuttal and _is_rebuttal_file(path.name):
+            continue
+
         if suffix == ".docx":
             points = _extract_docx_points(path)
             documents.append(
@@ -200,9 +222,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Extract material summary for PPT generation")
     parser.add_argument("materials_dir", help="Input folder with source files")
     parser.add_argument("output_dir", help="Directory for extracted summary/images")
+    parser.add_argument(
+        "--include-rebuttal",
+        action="store_true",
+        help="Include rebuttal/reviewer-response files (default excludes them)",
+    )
     args = parser.parse_args()
 
-    summary = build_summary(Path(args.materials_dir), Path(args.output_dir))
+    summary = build_summary(
+        Path(args.materials_dir),
+        Path(args.output_dir),
+        exclude_rebuttal=not args.include_rebuttal,
+    )
     print(f"Summary created with {len(summary['documents'])} documents and {len(summary['images'])} images")
 
 
