@@ -68,6 +68,7 @@ class OutlineTests(unittest.TestCase):
                         "研究方法：构建标准化处理流程并建立统一注释体系。",
                         "研究结果：在多癌种队列中识别到稳定差异表达信号并完成生存关联分析。",
                         "研究展望：扩展样本规模并增强临床转化应用。",
+                        "Email: author@example.com Correspondence may also be addressed to someone.",
                     ],
                 },
                 {
@@ -93,6 +94,7 @@ class OutlineTests(unittest.TestCase):
         self.assertIn("研究展望", titles)
         self.assertNotIn("审稿", merged)
         self.assertNotIn("reviewer", merged)
+        self.assertNotIn("email:", merged)
 
 
 if __name__ == "__main__":

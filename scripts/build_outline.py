@@ -45,6 +45,45 @@ REBUTTAL_PATTERNS = [
     "回复",
 ]
 
+NOISE_PATTERNS = [
+    "email:",
+    "correspondence",
+    "to whom correspondence",
+    "https://",
+    "http://",
+    "doi.org",
+    "advance access publication",
+    "the first four authors",
+    "department of",
+    "school of",
+    "author@example.com",
+    "本人完全了解中山大学有关保留",
+    "学位论文使用授权声明",
+    "原创性声明",
+    "答辩委员会",
+    "作者签名",
+]
+
+TOPIC_HINT_KEYWORDS = [
+    "sncrna",
+    "mirna",
+    "pirna",
+    "tdr",
+    "rrf",
+    "cancer",
+    "pan-cancer",
+    "database",
+    "pcsrnadb",
+    "pipeline",
+    "method",
+    "analysis",
+    "result",
+    "survival",
+    "differential",
+    "expression",
+    "tumor",
+]
+
 BACKGROUND_KEYWORDS = [
     "背景",
     "意义",
@@ -143,6 +182,30 @@ def _looks_rebuttal_text(text: str) -> bool:
     return any(pattern in lowered for pattern in REBUTTAL_PATTERNS)
 
 
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= ch <= "\u9fff" for ch in text)
+
+
+def _looks_noise_text(text: str) -> bool:
+    lowered = str(text).lower()
+    if any(pattern in lowered for pattern in NOISE_PATTERNS):
+        return True
+    if lowered.count("@") > 0:
+        return True
+    if len(text) > 420:
+        return True
+    return False
+
+
+def _looks_contentful_text(text: str) -> bool:
+    if _looks_noise_text(text):
+        return False
+    lowered = text.lower()
+    if _contains_cjk(text):
+        return True
+    return any(keyword in lowered for keyword in TOPIC_HINT_KEYWORDS)
+
+
 def _normalize_strategy(raw: dict[str, Any] | None) -> dict[str, Any]:
     merged = dict(DEFAULT_STRATEGY)
     if raw:
@@ -170,7 +233,20 @@ def _normalize_strategy(raw: dict[str, Any] | None) -> dict[str, Any]:
 
 def _collect_points(summary: dict[str, Any], limit: int = 180) -> list[str]:
     points: list[str] = []
-    for doc in summary.get("documents", []):
+    documents = list(summary.get("documents", []))
+
+    def _doc_priority(doc: dict[str, Any]) -> tuple[int, int]:
+        filename = str(doc.get("file", ""))
+        kind = str(doc.get("kind", "")).lower()
+        if "学位论文" in filename or "毕业论文" in filename:
+            return (0, 0)
+        if kind == "docx":
+            return (1, 0)
+        if kind == "pdf":
+            return (2, 0)
+        return (3, 0)
+
+    for doc in sorted(documents, key=_doc_priority):
         filename = str(doc.get("file", ""))
         kind = str(doc.get("kind", "")).lower()
 
@@ -187,6 +263,8 @@ def _collect_points(summary: dict[str, Any], limit: int = 180) -> list[str]:
             if "既有演示材料输入" in text:
                 continue
             if _looks_rebuttal_text(text):
+                continue
+            if not _looks_contentful_text(text):
                 continue
             points.append(text)
 
@@ -242,6 +320,22 @@ def _section_payloads(points: list[str], mode: str) -> dict[str, list[str]]:
             buckets["results"].append(point)
         else:
             buckets["methodology"].append(point)
+
+    def _point_quality(point: str) -> int:
+        score = 0
+        lowered = point.lower()
+        if _contains_cjk(point):
+            score += 3
+        if 30 <= len(point) <= 190:
+            score += 1
+        if any(keyword in lowered for keyword in TOPIC_HINT_KEYWORDS):
+            score += 1
+        if any(noise in lowered for noise in ["copyright", "all rights reserved"]):
+            score -= 2
+        return score
+
+    for key in buckets:
+        buckets[key] = sorted(buckets[key], key=_point_quality, reverse=True)
 
     payloads: dict[str, list[str]] = {}
     for section, fallback in SECTION_FALLBACKS.items():
