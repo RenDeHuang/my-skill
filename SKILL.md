@@ -16,7 +16,7 @@ It supports two modes in one workflow:
 
 1. Extract source facts and candidate images from material files.
 2. Generate dual-mode outline JSON files.
-3. Render editable PPTX using text boxes, shapes, charts/images (not screenshot export).
+3. Render editable PPTX using text boxes, shapes, and image/chart panels (not screenshot export).
 4. Optionally apply a pinned template via `--template`.
 5. Optionally override style via `--theme`.
 
@@ -55,10 +55,19 @@ Generated files are saved to the output directory:
 ## Design Rules
 
 - Keep PPT editable: do not rasterize whole slides into images for PPTX export.
+- Remove all template placeholders (`单击此处添加标题/文本`) before writing slide content.
+- Every content slide must include at least one `viz-*` visual component (panel, chart-like bars, or image card).
 - Prefer material-derived images; skip low-resolution assets.
 - Keep typography and colors consistent through the theme file.
 - Use `presentation` mode when narration is available.
 - Use `self_explanatory` mode for async reading and archival decks.
+
+## QA Checks (Required)
+
+After rendering, verify:
+- No placeholder shapes remain in any slide.
+- Every content slide has at least one shape named `viz-*`.
+- Slide text is editable in PowerPoint (text boxes, not flattened images).
 
 ## References
 

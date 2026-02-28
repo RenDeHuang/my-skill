@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from pptx import Presentation
+from pptx.enum.shapes import PP_PLACEHOLDER
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -47,8 +48,79 @@ class RendererTests(unittest.TestCase):
 
             pres = Presentation(str(out))
             self.assertEqual(len(pres.slides), 2)
-            self.assertIn("Demo Deck", pres.slides[0].shapes.title.text)
+            all_text = []
+            for shape in pres.slides[0].shapes:
+                if getattr(shape, "has_text_frame", False):
+                    all_text.append(shape.text_frame.text)
+            self.assertTrue(any("Demo Deck" in text for text in all_text))
             self.assertTrue(any(shape.has_text_frame for shape in pres.slides[1].shapes))
+
+    def test_render_removes_all_placeholders_even_with_template(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            template_path = tmpdir / "template.pptx"
+            out = tmpdir / "out.pptx"
+
+            # Build a template with standard placeholder layouts.
+            base = Presentation()
+            base.slides.add_slide(base.slide_layouts[0])
+            base.save(str(template_path))
+
+            outline = {
+                "title": "Template Cleanup Deck",
+                "mode": "presentation",
+                "theme": {
+                    "font_name": "Calibri",
+                    "title_color": "1E3A8A",
+                    "body_color": "0F172A",
+                    "accent_color": "0EA5E9",
+                    "background_color": "F8FAFC",
+                },
+                "slides": [
+                    {"type": "title", "title": "T1", "subtitle": "S1"},
+                    {"type": "content", "title": "C1", "bullets": ["A", "B", "C"]},
+                ],
+            }
+
+            render_ppt_from_outline(outline, out, template_path=template_path)
+            pres = Presentation(str(out))
+
+            placeholder_count = 0
+            for slide in pres.slides:
+                for shape in slide.shapes:
+                    if getattr(shape, "is_placeholder", False):
+                        # Defensive check: ensure all placeholder families are removed.
+                        _ = PP_PLACEHOLDER  # keep import used and explicit in test intent.
+                        placeholder_count += 1
+            self.assertEqual(placeholder_count, 0)
+
+    def test_each_content_slide_has_visual_shape(self):
+        outline = {
+            "title": "Visual Deck",
+            "mode": "presentation",
+            "theme": {
+                "font_name": "Calibri",
+                "title_color": "1E3A8A",
+                "body_color": "0F172A",
+                "accent_color": "0EA5E9",
+                "background_color": "F8FAFC",
+            },
+            "slides": [
+                {"type": "title", "title": "Cover"},
+                {"type": "content", "title": "Slide 1", "bullets": ["Point 1", "Point 2"]},
+                {"type": "content", "title": "Slide 2", "bullets": ["Point 3", "Point 4"]},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "visual.pptx"
+            render_ppt_from_outline(outline, out)
+            pres = Presentation(str(out))
+
+            # Content slides are expected after title slide.
+            for idx in [1, 2]:
+                names = [getattr(shape, "name", "") for shape in pres.slides[idx].shapes]
+                self.assertTrue(any(name.startswith("viz-") for name in names))
 
 
 if __name__ == "__main__":
