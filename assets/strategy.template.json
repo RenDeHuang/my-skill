@@ -1,0 +1,14 @@
+{
+  "speaker_role": "医学AI专家",
+  "audience_profile": "一线医生",
+  "core_goal": "知识传递与建立信任",
+  "style_by_section": {
+    "clinical": "专业严谨",
+    "ai_principle": "生动科普"
+  },
+  "target_slide_count": 24,
+  "max_minutes_per_slide": 1,
+  "content_depth": "专业翔实",
+  "require_chapter_dividers": true,
+  "citation_policy": "public_sources_only"
+}

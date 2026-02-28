@@ -157,7 +157,7 @@ def _add_content_slide(pres: Presentation, spec: dict[str, Any], theme: dict[str
     tf_body.clear()
     tf_body.word_wrap = True
 
-    bullets = spec.get("bullets", [])
+    bullets = spec.get("bullets") or spec.get("on_slide_content") or []
     for idx, bullet in enumerate(bullets):
         p = tf_body.paragraphs[0] if idx == 0 else tf_body.add_paragraph()
         p.text = bullet
@@ -258,7 +258,7 @@ def _add_content_slide(pres: Presentation, spec: dict[str, Any], theme: dict[str
         rr.text = f"{len(bullets)} pts"
         _set_run_style(rr, theme.get("font_name", "Calibri"), 14, theme.get("title_color", "1E3A8A"), bold=True)
 
-    speaker_notes = spec.get("speaker_notes")
+    speaker_notes = spec.get("speaker_notes") or spec.get("speaker_script")
     if speaker_notes:
         notes = slide.notes_slide.notes_text_frame
         notes.clear()
@@ -311,7 +311,15 @@ def render_ppt_from_outline(
     slides = outline.get("slides", [])
 
     for idx, slide_spec in enumerate(slides):
-        slide_type = slide_spec.get("type", "content")
+        slide_type = slide_spec.get("type")
+        if not slide_type:
+            page_type = str(slide_spec.get("page_type", "")).strip().lower()
+            if page_type == "cover":
+                slide_type = "title"
+            elif page_type == "section_divider":
+                slide_type = "section"
+            else:
+                slide_type = "content"
         enriched = dict(slide_spec)
         enriched.setdefault("mode", outline.get("mode", "presentation"))
 

@@ -1,4 +1,4 @@
-"""End-to-end pipeline: materials -> outline(s) -> editable PPTX deck(s)."""
+"""End-to-end pipeline: materials -> strategy-aligned outline(s) -> editable PPTX -> QA report."""
 
 from __future__ import annotations
 
@@ -7,9 +7,11 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from build_outline import build_outline
 from extract_materials import build_summary
+from qa_deck import validate_deck
 from render_editable_ppt import render_ppt_from_outline
 
 
@@ -24,6 +26,15 @@ def _modes(requested: str) -> list[str]:
     if requested == "both":
         return ["presentation", "self_explanatory"]
     return [requested]
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _default_strategy_path() -> Path:
+    root = Path(__file__).resolve().parents[1]
+    return root / "assets" / "strategy.template.json"
 
 
 def main() -> None:
@@ -47,6 +58,11 @@ def main() -> None:
     )
     parser.add_argument("--template", default="", help="Optional template PPTX path")
     parser.add_argument("--theme", default="", help="Optional theme JSON path")
+    parser.add_argument(
+        "--strategy",
+        default="",
+        help="Optional strategy JSON path; defaults to assets/strategy.template.json when available",
+    )
     args = parser.parse_args()
 
     materials_dir = Path(args.materials_dir).resolve()
@@ -56,9 +72,17 @@ def main() -> None:
     extracted_dir = output_dir / "extracted"
     summary = build_summary(materials_dir, extracted_dir)
 
-    theme_override = {}
+    theme_override: dict[str, Any] = {}
     if args.theme:
-        theme_override = json.loads(Path(args.theme).read_text(encoding="utf-8"))
+        theme_override = _read_json(Path(args.theme).resolve())
+
+    strategy_obj: dict[str, Any] | None = None
+    if args.strategy:
+        strategy_obj = _read_json(Path(args.strategy).resolve())
+    else:
+        default_strategy = _default_strategy_path()
+        if default_strategy.exists():
+            strategy_obj = _read_json(default_strategy)
 
     now = datetime.now().strftime("%Y%m%d-%H%M%S")
     slug_source = args.deck_name if args.deck_name else materials_dir.name
@@ -66,7 +90,7 @@ def main() -> None:
 
     generated = []
     for mode in _modes(args.mode):
-        outline = build_outline(summary, mode=mode)
+        outline = build_outline(summary, mode=mode, strategy=strategy_obj)
         if theme_override:
             merged = dict(outline.get("theme", {}))
             merged.update(theme_override)
@@ -79,13 +103,28 @@ def main() -> None:
         template = Path(args.template).resolve() if args.template else None
         render_ppt_from_outline(outline, deck_path, template_path=template)
 
-        generated.append({"mode": mode, "outline": str(outline_path), "pptx": str(deck_path)})
+        qa_report = validate_deck(deck_path, outline)
+        qa_path = output_dir / f"{slug}-{mode}-{now}.qa.json"
+        qa_path.write_text(json.dumps(qa_report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        generated.append(
+            {
+                "mode": mode,
+                "outline": str(outline_path),
+                "pptx": str(deck_path),
+                "qa": str(qa_path),
+                "qa_passed": qa_report.get("passed", False),
+            }
+        )
         print(f"Generated [{mode}] -> {deck_path}")
+        print(f"QA [{mode}] -> {'PASS' if qa_report.get('passed') else 'FAIL'} ({qa_path})")
 
     report = {
         "materials_dir": str(materials_dir),
         "generated_at": datetime.now().isoformat(),
+        "strategy_source": args.strategy or (str(_default_strategy_path()) if _default_strategy_path().exists() else ""),
         "generated": generated,
+        "all_passed": all(item.get("qa_passed", False) for item in generated),
     }
     report_path = output_dir / f"generation-report-{now}.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

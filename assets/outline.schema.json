@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/editable-ppt-fusion/outline.schema.json",
+  "title": "Editable PPT Fusion Outline",
+  "type": "object",
+  "required": ["mode", "strategy", "slides"],
+  "properties": {
+    "title": {"type": "string"},
+    "subtitle": {"type": "string"},
+    "mode": {
+      "type": "string",
+      "enum": ["presentation", "self_explanatory"]
+    },
+    "strategy": {
+      "type": "object",
+      "required": [
+        "speaker_role",
+        "audience_profile",
+        "core_goal",
+        "target_slide_count",
+        "max_minutes_per_slide",
+        "content_depth"
+      ],
+      "properties": {
+        "speaker_role": {"type": "string"},
+        "audience_profile": {"type": "string"},
+        "core_goal": {"type": "string"},
+        "style_by_section": {"type": "object"},
+        "target_slide_count": {"type": "integer", "minimum": 8},
+        "max_minutes_per_slide": {"type": "integer", "minimum": 1},
+        "content_depth": {"type": "string"},
+        "require_chapter_dividers": {"type": "boolean"},
+        "citation_policy": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["slide_number", "page_type", "title"],
+        "properties": {
+          "slide_number": {"type": "integer", "minimum": 1},
+          "page_type": {
+            "type": "string",
+            "enum": [
+              "cover",
+              "section_divider",
+              "agenda",
+              "background",
+              "methodology",
+              "quality_control",
+              "revision",
+              "application",
+              "conclusion",
+              "qa"
+            ]
+          },
+          "title": {"type": "string"},
+          "on_slide_content": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "visual_spec": {"type": "object"},
+          "speaker_script": {"type": "string"},
+          "design_rationale": {"type": "string"},
+          "type": {"type": "string"},
+          "bullets": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "speaker_notes": {"type": "string"}
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "page_type": {
+                  "not": {"enum": ["cover", "section_divider"]}
+                }
+              }
+            },
+            "then": {
+              "required": ["on_slide_content", "visual_spec"]
+            }
+          }
+        ],
+        "additionalProperties": true
+      }
+    },
+    "theme": {"type": "object"}
+  },
+  "additionalProperties": true
+}
